@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import re
 import sys
 import zlib
 from pathlib import Path
@@ -28,7 +29,10 @@ from analysis.runs import Run, by_config, ema, first_crossing, gpu_hours, load_r
 # Reference categorical palette (dataviz skill), assigned to configs in a FIXED order so a config keeps its colour
 # in every figure, whichever subset of configs is present.
 PALETTE = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
-CONFIG_ORDER = ["sync", "async-s1", "async-s4", "async-ctrl", "async-s8", "async-llmctrl"]
+# Colour slots: a config keeps its slot forever (append new configs; never reorder, or every figure repaints).
+CONFIG_ORDER = ["sync", "async-s1", "async-s4", "async-ctrl", "async-s8", "async-llmctrl", "async-s0"]
+# Display order in tables and bar charts: sync, then async by staleness.
+DISPLAY_ORDER = ["sync", "async-s0", "async-s1", "async-s4", "async-s8", "async-ctrl", "async-llmctrl"]
 INK, INK_2, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
 SMOOTH = 0.1  # EMA alpha for display smoothing of per-step curves
 
@@ -43,7 +47,7 @@ def color(config: str) -> str:
 def order(configs) -> list[str]:
     def key(c):
         b = c.removeprefix("pilot-")
-        return (CONFIG_ORDER.index(b) if b in CONFIG_ORDER else 99, c)
+        return (DISPLAY_ORDER.index(b) if b in DISPLAY_ORDER else 99, c)
 
     return sorted(configs, key=key)
 
@@ -282,6 +286,68 @@ def fig_offpolicy(groups, out):
     save(fig, out, "offpolicy")
 
 
+def fig_staleness_curve(groups, out):
+    """Seconds per step and samples dropped per step against max_staleness, with sync as a reference line."""
+    pts = []
+    for cfg, runs in groups.items():
+        m = re.fullmatch(r"async-s(\d+)", cfg.removeprefix("pilot-"))
+        if m:
+            pts.append((int(m.group(1)), cfg, runs))
+    if len(pts) < 2:
+        return
+    pts.sort()
+    fig, axes = plt.subplots(1, 2, figsize=(10, 3.6))
+    for ax, key, title in (
+        (axes[0], "step_s", "seconds per optimizer step"),
+        (axes[1], "dropped_stale", "samples dropped as too stale, per step"),
+    ):
+        xs = [s for s, _, _ in pts]
+        per_run = [[r.mean(key) for r in runs if r.mean(key) is not None] for _, _, runs in pts]
+        means = [float(np.mean(v)) if v else np.nan for v in per_run]
+        ax.plot(xs, means, color=INK_2, linewidth=1, zorder=1)
+        for x, (_, cfg, _), vals in zip(xs, pts, per_run):
+            if vals:
+                ax.vlines(x, min(vals), max(vals), color=color(cfg), linewidth=2, zorder=2)
+                ax.plot(
+                    x,
+                    np.mean(vals),
+                    "o",
+                    color=color(cfg),
+                    markersize=8,
+                    markeredgecolor=SURFACE,
+                    markeredgewidth=2,
+                    zorder=3,
+                )
+                ax.annotate(
+                    fmt_value(np.mean(vals)),
+                    (x, np.mean(vals)),
+                    xytext=(8, 8),
+                    textcoords="offset points",
+                    va="center",
+                    color=INK_2,
+                )
+        if key == "step_s" and "sync" in groups:
+            sync = float(np.mean([r.mean(key) for r in groups["sync"]]))
+            ax.axhline(sync, color=color("sync"), linewidth=2, linestyle="--")
+            ax.annotate(
+                f"sync {sync:.1f}", (xs[-1], sync), xytext=(-4, 4), textcoords="offset points", ha="right", color=INK_2
+            )
+        ax.set_xticks(xs)
+        ax.set_xlabel("max_staleness")
+        ax.set_title(title, fontsize=10)
+        ax.set_ylim(bottom=0)
+    fig.suptitle(
+        "Async GRPO vs allowed staleness (mean over steps; line = min–max over seeds)",
+        x=0.01,
+        ha="left",
+        fontsize=11,
+        fontweight="bold",
+        color=INK,
+    )
+    fig.tight_layout()
+    save(fig, out, "staleness_curve")
+
+
 def fig_controller(groups, out):
     ctrl_runs = [r for runs in groups.values() for r in runs if r.decisions]
     if not ctrl_runs:
@@ -452,6 +518,7 @@ def main() -> None:
     fig_throughput(groups, out)
     fig_staleness(groups, out)
     fig_offpolicy(groups, out)
+    fig_staleness_curve(groups, out)
     fig_controller(groups, out)
 
 

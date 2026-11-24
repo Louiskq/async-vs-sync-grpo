@@ -50,3 +50,20 @@ therefore "match the best fixed setting" only because every setting is equal.
 
 **Choice:** run async-s0 × 2 seeds first. That maps the actual staleness/throughput curve (s=0 → 1 → 4) before
 deciding what M4 should control. In TRL, s=0 drops anything generated before the latest weight sync.
+
+### Result of the async-s0 runs (2026-11-24)
+
+| | sync | async-s0 | async-s1 | async-s4 |
+|---|---|---|---|---|
+| s/step | 9.9 | 13.1 | 5.5 | 5.9 |
+| samples dropped as stale / step | — | 241 | 2.7 | 0 |
+| best eval acc | 0.754 | 0.733 | 0.758 | 0.737 |
+
+Fully on-policy async (s=0) is *slower than sync*: it discards what was generated while a step trained, and the trainer
+idles. One step of staleness gives the whole speed-up; more gives nothing here (`results/m3/staleness_curve.png`).
+
+**Instability seen in 2 of 8 runs.** sync seed 1 and async-s0 seed 1 had a completion-length blow-up after about step
+250: >90% of completions hit the 512-token cap. async-s0 seed 1's eval fell to 0.494 at step 300. The other six runs
+grew more slowly (truncation at most 26% in the last 50 steps). Both blow-ups were in on-policy configs, but two seeds
+cannot support a claim that staleness protects against this. Step-300 accuracy is therefore partly contaminated, and
+best accuracy and time-to-target are reported alongside it.
