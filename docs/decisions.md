@@ -67,3 +67,14 @@ idles. One step of staleness gives the whole speed-up; more gives nothing here (
 grew more slowly (truncation at most 26% in the last 50 steps). Both blow-ups were in on-policy configs, but two seeds
 cannot support a claim that staleness protects against this. Step-300 accuracy is therefore partly contaminated, and
 best accuracy and time-to-target are reported alongside it.
+
+## 2026-11-24 — M4: the staleness controller was not run
+
+**Evidence:** s=0 is strictly worse than s≥1 (13.1 vs 5.5–5.9 s/step), and s=1 and s=4 are indistinguishable in
+speed and accuracy. A `max_staleness` controller would match the best fixed setting by construction. The drift
+signals track training phase more than staleness. A learning-rate controller (the SPEC's fallback) would need
+late-training thresholds, but only the M3 runs show late-training behaviour, and setting thresholds from them would
+break the "pilot data only" rule unless a new, longer pilot were run first.
+
+**Choice:** skip the controller runs and write up. The controller code, tests and `configs/async-ctrl.yaml` stay in the
+repo. 7.8 GPU-hours of the budget are left unspent.
