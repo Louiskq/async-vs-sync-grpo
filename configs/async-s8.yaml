@@ -1,0 +1,5 @@
+# Stretch: shows where staleness starts hurting.
+base: base.yaml
+trainer: async
+async:
+  max_staleness: 8

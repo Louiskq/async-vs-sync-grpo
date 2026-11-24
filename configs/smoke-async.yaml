@@ -1,0 +1,11 @@
+# M0 smoke test: small model, 20 steps, no checkpoints.
+base: async-s4.yaml
+name: smoke-async
+model: Qwen/Qwen3-0.6B
+data: {train_limit: 512}
+common:
+  max_steps: 20
+  save_strategy: "no"
+async:
+  token_budget: 8192
+  gradient_accumulation_steps: 2

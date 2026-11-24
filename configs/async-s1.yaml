@@ -1,0 +1,4 @@
+base: base.yaml
+trainer: async
+async:
+  max_staleness: 1

@@ -1,0 +1,18 @@
+# Rule-based controller on max_staleness (M4). high/low are deliberately unset: they must come from the pilot's
+# signal distribution (python -m analysis.thresholds runs/pilot-*), never from the reported runs. Running this
+# file before they are filled in fails at ControllerConfig.
+base: base.yaml
+trainer: async
+async:
+  max_staleness: 4          # starting value
+controller:
+  knob: max_staleness
+  signal: logratio_abs_p95
+  high: null
+  low: null
+  every_k: 10
+  warmup_steps: 10
+  cooldown_steps: 20
+  ema_alpha: 0.2
+  min_value: 1
+  max_value: 8

@@ -1,0 +1,58 @@
+# Shared by every run. Only the variable under study may differ between runs: put it in the run's own file.
+model: Qwen/Qwen3-1.7B
+max_model_len: 1024          # vLLM --max-model-len: prompt (<~300 tokens) + max_completion_length
+seed: 0                      # overridden per run with --seed; also seeds the prompt order and the vLLM server
+
+data:
+  train_limit: null          # null = all 7,473 GSM8K train problems
+  eval_size: 500             # fixed held-out subset of the test split
+  eval_seed: 1234
+
+# Held identical across sync and async (each key must exist in both GRPOConfig and AsyncGRPOConfig).
+common:
+  max_steps: 300
+  learning_rate: 1.0e-6
+  lr_scheduler_type: constant
+  warmup_steps: 0
+  num_generations: 8
+  max_completion_length: 512
+  temperature: 1.0
+  top_p: 1.0
+  epsilon: 0.2
+  vllm_importance_sampling_clip_min: 0.5   # token-level masked IS against the vLLM sampler, same bounds in both
+  vllm_importance_sampling_clip_max: 5.0
+  chat_template_kwargs: {enable_thinking: false}
+  bf16: true                 # bf16 autocast over fp32 master weights in both (see dtype below)
+  gradient_checkpointing: true
+  logging_steps: 1
+  save_strategy: steps
+  save_steps: 50
+  save_only_model: true
+  report_to: none
+  vllm_server_base_url: http://localhost:8000
+
+sync:
+  use_vllm: true
+  vllm_mode: server
+  per_device_train_batch_size: 32
+  gradient_accumulation_steps: 8   # 32 x 8 = 256 completions = 32 prompts x 8 generations per optimizer step
+  num_iterations: 1                # one gradient step per batch: fully on-policy
+  beta: 0.0                        # no KL / reference model (AsyncGRPOTrainer has none)
+  loss_type: dapo                  # token-level normalisation, as AsyncGRPOTrainer
+  scale_rewards: group             # advantages standardised within each group, as AsyncGRPOTrainer
+  vllm_importance_sampling_mode: token_mask
+  shuffle_dataset: false           # read prompts in the order data.py shuffled them, as async does
+  model_init_kwargs: {dtype: float32}
+
+async:
+  dtype: float32
+  score_centering: false           # use the clipped PPO objective, as sync, not TRL's default score centering
+  weight_sync_steps: 1
+  max_staleness: 4
+  # The async step is token-budgeted, not sample-counted: each optimizer step is gradient_accumulation_steps
+  # rows of <= token_budget unique tokens. 4 x 16384 ~ 32 GSM8K groups at ~250-token completions; the pilot
+  # measures batch/samples_per_step and this is recalibrated so async matches sync's 256 rollouts/step on average.
+  token_budget: 16384
+  gradient_accumulation_steps: 4
+
+controller: null
