@@ -4,7 +4,7 @@
 adaptive controller matches/beats the best fixed staleness."* Each number in that sentence will come from
 `results/summary.md`.
 
-A small, reproducible comparison on Qwen3-1.7B / GSM8K with 2 GPUs (GPU 0 = vLLM, GPU 1 = trainer) of:
+A small, reproducible comparison on Qwen3-0.6B / GSM8K (1.7B was near-ceiling: docs/decisions.md) with 2 GPUs (GPU 0 = vLLM, GPU 1 = trainer) of:
 
 1. **Synchronous vs asynchronous GRPO.** Same model, data order, GPU split, vLLM server and hyperparameters; only
    whether generation overlaps training (TRL `GRPOTrainer` vs `AsyncGRPOTrainer`).
@@ -20,7 +20,7 @@ no original experiments. This repo adds small-scale measurements.
 |---|---|
 | M0 environment smoke test | passed on Isambard-AI GH200 (docs/setup.md) |
 | M1 reward, data, logging | done: unit-tested (`pytest`) |
-| M2 pilot | script ready (`slurm/pilot.sh`) |
+| M2 pilot | 1.7B pilot run → switched to 0.6B (docs/decisions.md); 0.6B re-pilot pending |
 | M3 core sweep | scripts ready (`slurm/sweep.sh`) |
 | M4 controller | implemented and unit-tested; thresholds come from the pilot |
 | M5 write-up | — |

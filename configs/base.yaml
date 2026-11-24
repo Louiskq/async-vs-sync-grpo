@@ -1,5 +1,5 @@
 # Shared by every run. Only the variable under study may differ between runs: put it in the run's own file.
-model: Qwen/Qwen3-1.7B
+model: Qwen/Qwen3-0.6B       # not 1.7B: near-ceiling on GSM8K in the M2 pilot (docs/decisions.md)
 max_model_len: 1024          # vLLM --max-model-len: prompt (<~300 tokens) + max_completion_length
 seed: 0                      # overridden per run with --seed; also seeds the prompt order and the vLLM server
 attention_kernel: fa2        # same hub FlashAttention kernel in both trainers (src/attention.py): FA3 has no aarch64/cu130 build
@@ -51,9 +51,9 @@ async:
   weight_sync_steps: 1
   max_staleness: 4
   # The async step is token-budgeted, not sample-counted: each optimizer step is gradient_accumulation_steps
-  # rows of <= token_budget unique tokens. 4 x 16384 ~ 32 GSM8K groups at ~250-token completions; the pilot
-  # measures batch/samples_per_step and this is recalibrated so async matches sync's 256 rollouts/step on average.
-  token_budget: 16384
+  # rows of <= token_budget unique tokens. The 1.7B pilot trained 220 rollouts/step at 4 x 16384 (~235-token
+  # completions); 4 x 18432 targets ~250, close to sync's 256. The 0.6B re-pilot checks batch/samples_per_step.
+  token_budget: 18432
   gradient_accumulation_steps: 4
 
 controller: null

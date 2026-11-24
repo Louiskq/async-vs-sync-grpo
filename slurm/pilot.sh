@@ -4,7 +4,7 @@
 #SBATCH --time=02:00:00
 #SBATCH --output=logs/%x-%j.out
 # Overrides are parsed as YAML: a bare no would become False, hence the quoted "no".
-# M2: 25 steps each of sync and async-s4 on Qwen3-1.7B, logged as pilot-* runs. No checkpoints, no eval.
+# M2: 25 steps each of sync and async-s4 on the base model, logged as pilot-* runs. No checkpoints, no eval.
 #   sbatch slurm/pilot.sh
 export SKIP_EVAL=1
 STEPS=${STEPS:-25}
