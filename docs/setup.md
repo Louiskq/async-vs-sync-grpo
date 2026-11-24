@@ -18,11 +18,16 @@ by `slurm/setup_env.sh`: they are the source of truth for what ran.
 **The ARM risk.** vLLM publishes `manylinux_2_28_aarch64` wheels on PyPI for every release from 0.25 onwards (checked
 2026-11-23), so nothing needs to be built from source. The remaining risk is the driver: see below.
 
-## Isambard-AI: CUDA 13 wheels on a CUDA 12.7 driver
+## Isambard-AI: CUDA 13 wheels and the driver
 
-Isambard-AI Phase 2 nodes run driver 565.57 (CUDA 12.7). vLLM ≥ 0.23 is built against CUDA 13.0, so it fails with
-`The NVIDIA driver on your system is too old (found version 12070)` unless you apply four userspace fixes. All four
-are in `slurm/setup_env.sh` and `slurm/_common.sh`:
+**Update 2026-11-24: the nodes now run driver 580.196.07, which supports CUDA 13 natively.** The forward-compat
+libraries (fix 1 below) are now *harmful*: with them on `LD_LIBRARY_PATH`, CUDA init fails with error 803
+(`system has unsupported display driver / cuda driver combination`). This was verified on a GH200 node, with and
+without them. `slurm/_common.sh` therefore applies them only when the driver major version is < 580.
+
+Before that, the nodes ran driver 565.57 (CUDA 12.7). vLLM ≥ 0.23 is built against CUDA 13.0, so it failed with
+`The NVIDIA driver on your system is too old (found version 12070)` unless you applied four userspace fixes. All four
+are in `slurm/setup_env.sh` and `slurm/_common.sh`; fixes 2–4 still apply to anything that JIT-compiles:
 
 1. **Forward-compat libraries.** Extract `cuda-compat-13-0-580.95.05-1.aarch64.rpm` (NVIDIA's sbsa repo) to scratch,
    and prepend its `compat/` directory to `LD_LIBRARY_PATH` in every job.
@@ -42,6 +47,9 @@ mkdir -p logs
 sbatch slurm/setup_env.sh                 # on a compute node: builds the venv, writes requirements.lock
 sbatch slurm/smoke.sh                     # M0: 20 async + 20 sync steps on Qwen3-0.6B
 ```
+
+**Python:** build the venv from the Cray PE Python (`/opt/cray/pe/python/3.11.7`). The system `/usr/bin/python3.11`
+lacks the `sqlite3` module, which vLLM imports; `setup_env.sh` checks for this before installing.
 
 Pre-download the models on a compute node rather than the login node, which has a 4 GiB memory cap:
 

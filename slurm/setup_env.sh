@@ -16,7 +16,10 @@ PYTHON=${PYTHON:-$([[ -x $CRAY_PY ]] && echo "$CRAY_PY" || echo python3.11)}
 VLLM_VERSION=${VLLM_VERSION:-0.26.0}   # last version verified on Isambard-AI GH200; TRL 1.18.2 allows >=0.23,<0.34
 TRL_VERSION=${TRL_VERSION:-1.18.2}
 
-# 1. CUDA forward-compat libs (Isambard-AI: driver 565 = CUDA 12.7; vLLM wheels need the CUDA 13 runtime).
+# 1. CUDA forward-compat libs, only for drivers older than 580 (vLLM >= 0.23 wheels need the CUDA 13 runtime).
+#    Isambard-AI ran 565 (CUDA 12.7) until late 2026 and runs 580.196 now; on 580+ the compat libs break CUDA.
+DRIVER_MAJOR=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader | head -1 | cut -d. -f1)
+if [[ "$DRIVER_MAJOR" -ge 580 ]]; then CUDA_COMPAT_DIR=""; fi
 if [[ -n "${CUDA_COMPAT_DIR:-}" && ! -e $CUDA_COMPAT_DIR/libcuda.so ]]; then
     ROOT=${CUDA_COMPAT_DIR%/usr/local/cuda-13.0/compat}
     mkdir -p "$ROOT" && pushd "$ROOT" >/dev/null
@@ -42,7 +45,9 @@ CU13=$VENV/lib/$PYVER/site-packages/nvidia/cu13
 if [[ -d $CU13 ]]; then
     ln -sfn lib "$CU13/lib64"
     ln -sf libcudart.so.13 "$CU13/lib/libcudart.so"
-    if [[ -n "${CUDA_COMPAT_DIR:-}" ]]; then mkdir -p "$CU13/lib/stubs" && ln -sf "$CUDA_COMPAT_DIR/libcuda.so" "$CU13/lib/stubs/libcuda.so"; fi
+    LIBCUDA=${CUDA_COMPAT_DIR:+$CUDA_COMPAT_DIR/libcuda.so}
+    LIBCUDA=${LIBCUDA:-$(ldconfig -p | awk '/libcuda\.so /{print $NF; exit}')}
+    if [[ -n "$LIBCUDA" ]]; then mkdir -p "$CU13/lib/stubs" && ln -sf "$LIBCUDA" "$CU13/lib/stubs/libcuda.so"; fi
 fi
 
 # 5. Record exactly what got installed.
