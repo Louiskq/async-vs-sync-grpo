@@ -1,5 +1,5 @@
 [project]
-name = "async-grpo-hpcontrol"
+name = "async-vs-sync-grpo"
 version = "0.1.0"
 description = "Async vs sync GRPO on GSM8K, and within-run control of max_staleness"
 requires-python = ">=3.11"

@@ -40,7 +40,7 @@ are in `slurm/setup_env.sh` and `slurm/_common.sh`; fixes 2–4 still apply to a
 ## Steps
 
 ```bash
-git clone <repo> && cd async-grpo-hpcontrol
+git clone <repo> && cd async-vs-sync-grpo
 cp slurm/env.example.sh slurm/env.sh      # fill in VENV, SCRATCH_DIR, HF_HOME, RUNS_DIR, CUDA_COMPAT_DIR
 export SBATCH_ACCOUNT=<account>           # sbatch reads it; add SBATCH_PARTITION if your cluster needs one
 mkdir -p logs
@@ -80,3 +80,14 @@ matched; these numbers only show that the pipeline works, not the comparison.
 Getting here took four attempts, each fixed in the scripts: system Python without `sqlite3`; CUDA forward-compat
 libs breaking on the new driver (error 803); FlashAttention-3 hub kernel missing for aarch64/cu130. M0 total:
 0.91 GPU-hours.
+
+## Compute used
+
+17.2 GPU-hours of the 25-hour budget (Slurm accounting):
+
+| phase | GPU-h |
+|---|---|
+| M0: environment build + smoke tests (4 attempts) | 0.9 |
+| M2: pilots (1.7B; 0.6B at LR 1e-6; 0.6B at LR 3e-6) | 1.4 |
+| M3: sync, async-s1, async-s4 × 2 seeds, incl. eval | 9.7 |
+| async-s0 × 2 seeds, incl. eval | 5.2 |
