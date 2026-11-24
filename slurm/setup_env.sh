@@ -33,7 +33,7 @@ fi
 "$PYTHON" -m venv --clear "$VENV"
 "$VENV/bin/pip" install -q -U pip
 "$VENV/bin/pip" install -q "vllm==$VLLM_VERSION"
-"$VENV/bin/pip" install -q "trl==$TRL_VERSION"
+"$VENV/bin/pip" install -q "trl[kernels]==$TRL_VERSION"   # AsyncGRPO's tree attention loads hub kernels
 "$VENV/bin/pip" install -q nvidia-ml-py pyyaml matplotlib pytest ruff ninja
 
 # 3. A consistent CUDA 13.0 toolchain for anything vLLM/flashinfer JIT-compiles (nvcc, crt and nvvm must match).

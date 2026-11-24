@@ -12,6 +12,7 @@ import time
 
 from trl import GRPOConfig, GRPOTrainer
 
+from src.attention import hf_attn_implementation
 from src.common import launch_time, parse_args, run_info
 from src.config import trainer_kwargs
 from src.data import load_train
@@ -53,6 +54,11 @@ def main() -> None:
     if cfg.get("controller"):
         raise SystemExit("the controller is only defined for async runs")
     kwargs = trainer_kwargs(cfg, GRPOConfig, "sync")
+    # Same FlashAttention kernel as the async trainer's tree attention (src/attention.py).
+    kwargs["model_init_kwargs"] = {
+        **(kwargs.get("model_init_kwargs") or {}),
+        "attn_implementation": hf_attn_implementation(cfg["attention_kernel"]),
+    }
     args = GRPOConfig(output_dir=cli.output_dir, seed=cfg["seed"], **kwargs)
     if args.shuffle_dataset:
         raise SystemExit("sync must read prompts in order (shuffle_dataset: false) to match the async data order")

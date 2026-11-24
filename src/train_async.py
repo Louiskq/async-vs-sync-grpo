@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from trl import AsyncGRPOConfig, AsyncGRPOTrainer
 
+from src.attention import install_async_kernel
 from src.common import launch_time, parse_args, run_info
 from src.config import trainer_kwargs
 from src.controller import ControllerConfig, RuleController
@@ -48,6 +49,7 @@ def main() -> None:
     cfg, cli = parse_args(__doc__)
     if cfg["trainer"] != "async":
         raise SystemExit(f"{cfg['name']} is a {cfg['trainer']!r} config; use src.train_{cfg['trainer']}")
+    install_async_kernel(cfg["attention_kernel"])  # before training: fail fast if the kernel has no build here
     kwargs = trainer_kwargs(cfg, AsyncGRPOConfig, "async")
     args = AsyncGRPOConfig(output_dir=cli.output_dir, seed=cfg["seed"], **kwargs)
     train = load_train(seed=cfg["seed"], limit=cfg.get("data", {}).get("train_limit"))

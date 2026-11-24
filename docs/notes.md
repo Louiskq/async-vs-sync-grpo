@@ -93,3 +93,20 @@ optimizer step). TRL logs only the per-step mean and max. We also record the per
   the mismatch is part of what the log-ratio measures, and it is the same for both trainers.
 - `lr_scheduler_type` defaults to `constant` in AsyncGRPO but `linear` in GRPO. Both are set to `constant`.
 - The async epoch logic counts prompts actually trained on. With `max_steps` set, `max_steps` is the stop condition.
+
+## Attention kernel (found in the M0 smoke test)
+
+AsyncGRPO trains on tree-packed rows through a custom attention function (`tree_attention`, ~L317). It calls
+`flash_attn_varlen_func` from a kernel that `_flash_attn()` downloads with the `kernels` package
+(`pip install trl[kernels]`; TRL's README says so, but plain `trl` doesn't install it):
+`kernels-community/flash-attn3` (FA4 on Blackwell). **flash-attn3 has no aarch64 build for torch ≥ 2.10 or CUDA 13**
+(checked 2026-11-24), and vLLM 0.26 pins torch 2.11 + cu130. So on GH200 the async trainer cannot train as shipped.
+
+`kernels-community/flash-attn2` does have `torch211-cxx11-cu130-aarch64-linux`, with the same varlen API, and it
+aligns the causal mask bottom-right when a segment has fewer queries than keys. That alignment is what tree attention
+relies on: a segment's queries see its ancestors' K/V plus their own causal past. `src/attention.py` replaces
+`trl.trainer.async_grpo_trainer._flash_attn` with the FA2 kernel. `scripts/check_tree_attention.py` checks it against a
+PyTorch reference (GQA 16/8 heads, bf16, uneven segments) on the GPU before the smoke runs.
+
+For fairness, the sync trainer uses the **same** kernel through transformers' hub-kernel attention
+(`attn_implementation="kernels-community/flash-attn2@v1"`). Both are set by one key, `attention_kernel: fa2`.

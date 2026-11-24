@@ -7,6 +7,8 @@
 #   sbatch slurm/smoke.sh
 set -e  # stop at the first failed run
 export SKIP_EVAL=1
+# The attention kernel must be numerically right before anything trains with it.
+(source slurm/_common.sh && python scripts/check_tree_attention.py fa2)
 bash slurm/_run.sh configs/smoke-async.yaml 0
 bash slurm/_run.sh configs/smoke-sync.yaml 0
 source slurm/_common.sh

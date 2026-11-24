@@ -2,6 +2,7 @@
 model: Qwen/Qwen3-1.7B
 max_model_len: 1024          # vLLM --max-model-len: prompt (<~300 tokens) + max_completion_length
 seed: 0                      # overridden per run with --seed; also seeds the prompt order and the vLLM server
+attention_kernel: fa2        # same hub FlashAttention kernel in both trainers (src/attention.py): FA3 has no aarch64/cu130 build
 
 data:
   train_limit: null          # null = all 7,473 GSM8K train problems

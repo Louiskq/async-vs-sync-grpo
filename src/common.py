@@ -40,7 +40,7 @@ def versions() -> dict[str, str]:
     import importlib.metadata as md
 
     out = {"python": platform.python_version()}
-    for pkg in ("torch", "transformers", "trl", "vllm", "accelerate", "datasets"):
+    for pkg in ("torch", "transformers", "trl", "vllm", "accelerate", "datasets", "kernels"):
         try:
             out[pkg] = md.version(pkg)
         except md.PackageNotFoundError:
@@ -54,6 +54,7 @@ def run_info(cfg: dict, kind: str) -> dict[str, Any]:
         "kind": kind,
         "model": cfg["model"],
         "seed": cfg["seed"],
+        "attention_kernel": cfg.get("attention_kernel"),
         "versions": versions(),
         "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
     }

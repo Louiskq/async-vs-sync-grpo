@@ -99,3 +99,35 @@ def test_slurm_overrides_parse_to_the_intended_types():
             kwargs = {**trainer_kwargs(cfg, cls, cfg["trainer"]), "bf16": False}
             cls(output_dir="/tmp/unused", **kwargs)  # raises on save_strategy=False
             assert cfg["name"].startswith(("pilot-", "smoke-")) or cfg["name"] == config.split("/")[-1][:-5]
+
+
+def test_attention_kernel_is_shared_and_pinned():
+    from src.attention import hf_attn_implementation, kernel_spec
+
+    for path in RUNS:
+        assert load_config(path)["attention_kernel"] == "fa2", path.stem
+    assert hf_attn_implementation("fa2") == "kernels-community/flash-attn2@v1"
+    assert kernel_spec("fa2") == ("kernels-community/flash-attn2", 1)
+    with pytest.raises(ValueError):
+        kernel_spec("sdpa")
+
+
+def test_install_async_kernel_replaces_trl_loader(monkeypatch):
+    import sys
+    import types
+
+    import trl.trainer.async_grpo_trainer as agt
+
+    from src.attention import install_async_kernel
+
+    loaded = []
+    fake_kernel = object()
+    monkeypatch.setitem(
+        sys.modules,
+        "kernels",
+        types.SimpleNamespace(get_kernel=lambda repo, version: loaded.append((repo, version)) or fake_kernel),
+    )
+    monkeypatch.setattr(agt, "_flash_attn", agt._flash_attn)  # restored after the test
+    install_async_kernel("fa2")
+    assert loaded == [("kernels-community/flash-attn2", 1)]
+    assert agt._flash_attn() is fake_kernel
