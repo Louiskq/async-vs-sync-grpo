@@ -1,0 +1,7 @@
+# Fully on-policy async: TRL still lets generation run one step ahead (lookahead = max(s, 1) steps), but drops every
+# sample generated before the latest weight sync, so overlapped generation is wasted. Added after M3 showed s=1 and
+# s=4 behave identically (docs/decisions.md).
+base: base.yaml
+trainer: async
+async:
+  max_staleness: 0

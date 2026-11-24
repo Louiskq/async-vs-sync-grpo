@@ -40,3 +40,13 @@ pilot uses the final sweep config, so its thresholds apply directly.
 
 **Also:** the controller signal is now chosen by async-vs-sync separation over noise, not by relative noise alone
 (clip fraction 4.2× vs p95 |log-ratio| 0.6× at 1e-6). See `analysis/thresholds.py`.
+
+## 2026-11-24 — Add async-s0 before building the controller (after M3)
+
+**Evidence** (`results/m3/summary.md`): async-s1 and async-s4 were indistinguishable. s/step was 5.5 vs 5.9, final
+eval 0.724 vs 0.724, and generation kept up with one step of lookahead. The clip fraction tracked training phase
+(0.0025 → 0.0045 over the run, higher for s=1 than s=4 late on) more than staleness. A max_staleness controller would
+therefore "match the best fixed setting" only because every setting is equal.
+
+**Choice:** run async-s0 × 2 seeds first. That maps the actual staleness/throughput curve (s=0 → 1 → 4) before
+deciding what M4 should control. In TRL, s=0 drops anything generated before the latest weight sync.
