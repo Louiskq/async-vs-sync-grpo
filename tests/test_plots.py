@@ -73,3 +73,16 @@ def test_plots_end_to_end(tmp_path, monkeypatch):
     # sync final acc 0.7 -> target 0.63; async-s4 reaches 0.6 at step 30 and 0.7 at step 60 = 660 s = 11 min
     assert "0.630" in summary
     assert "| async-s4 | 2 | 0.700 [0.700, 0.700] | 11.0 [11.0, 11.0] |" in summary
+
+
+def test_pilot_report_runs_on_logs(tmp_path, monkeypatch, capsys):
+    runs = tmp_path / "runs"
+    fake_run(runs, "pilot-sync", 0, "sync", 20.0)
+    fake_run(runs, "pilot-async-s4", 0, "async", 11.0, staleness=4)
+    monkeypatch.setattr("sys.argv", ["pilot_report.py", "--runs", str(runs)])
+    from analysis.pilot_report import main
+
+    main()
+    out = capsys.readouterr().out
+    assert "| s_per_step | 11 | 20 |" in out
+    assert "Projection" in out
