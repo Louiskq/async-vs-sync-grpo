@@ -18,7 +18,7 @@ no original experiments. This repo adds small-scale measurements.
 
 | Milestone | State |
 |---|---|
-| M0 environment smoke test | scripts ready (`slurm/setup_env.sh`, `slurm/smoke.sh`); not yet run |
+| M0 environment smoke test | passed on Isambard-AI GH200 (docs/setup.md) |
 | M1 reward, data, logging | done: unit-tested (`pytest`) |
 | M2 pilot | script ready (`slurm/pilot.sh`) |
 | M3 core sweep | scripts ready (`slurm/sweep.sh`) |

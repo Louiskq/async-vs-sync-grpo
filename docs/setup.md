@@ -57,6 +57,26 @@ Pre-download the models on a compute node rather than the login node, which has 
 srun --gres=gpu:1 --time=00:30:00 bash -c 'source slurm/env.sh; $VENV/bin/hf download Qwen/Qwen3-1.7B; $VENV/bin/hf download Qwen/Qwen3-0.6B'
 ```
 
-## Smoke test result (M0)
+## Smoke test result (M0): passed 2026-11-24, job 8801923
 
-_Not yet run._ The first `slurm/smoke.sh` output goes here: steps completed, s/step, and whether weight sync worked.
+Qwen3-0.6B, 20 steps each, 2 × GH200 on one node (driver 580.196.07). Versions are in `environment.md` and
+`requirements.lock` (torch 2.11.0+cu130, vLLM 0.26.0, TRL 1.18.2, transformers 5.24.0, kernels 0.18.3).
+
+| | async (max_staleness=4) | sync |
+|---|---|---|
+| steps completed | 20 / 20 | 20 / 20 |
+| startup (server + model load + cold sync), excluded from wall-clock | 203 s | 144 s |
+| s/step (mean, steps 4–20) | 1.05 | 2.88 |
+| rollouts / step | ~72 (token-budgeted) | 64 |
+| NCCL weight sync | 0.12–0.19 s per step | (inside generation) |
+| GPU util vLLM / trainer | 73% / 78% | 34% / 46% |
+| staleness of trained samples | mostly 3–4 (hist 0:123 1:80 2:237 3:679 4:384) | 0 |
+| p95 \|log π_current − log π_vLLM\| | 0.076 | 0.074 |
+| groups dropped (all-equal rewards) | 37% | 37% (kept in batch) |
+
+The attention-kernel check passed: FA2 vs reference, max |Δ| = 0.016 in bf16. The smoke batch sizes are not
+matched; these numbers only show that the pipeline works, not the comparison.
+
+Getting here took four attempts, each fixed in the scripts: system Python without `sqlite3`; CUDA forward-compat
+libs breaking on the new driver (error 803); FlashAttention-3 hub kernel missing for aarch64/cu130. M0 total:
+0.91 GPU-hours.
