@@ -3,13 +3,16 @@
 #SBATCH --gres=gpu:1
 #SBATCH --time=01:00:00
 #SBATCH --output=logs/%x-%j.out
-# Build the venv (M0). Run on a COMPUTE node: login nodes have a 4 GiB memory cap that pip/torch installs can hit.
+# Build the venv (M0), replacing any existing one at $VENV. Run on a COMPUTE node: login nodes have a 4 GiB memory cap that pip/torch installs can hit.
 #   sbatch slurm/setup_env.sh        (needs slurm/env.sh; PYTHON defaults to python3.11)
 # Writes requirements.lock and environment.md (pip freeze + driver/CUDA info) at the repo root.
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(pwd)}"
 source slurm/env.sh
-PYTHON=${PYTHON:-python3.11}
+# Isambard-AI's /usr/bin/python3.11 lacks the sqlite3 module (vLLM imports it); the Cray PE Python has it.
+CRAY_PY=/opt/cray/pe/python/3.11.7/bin/python3
+PYTHON=${PYTHON:-$([[ -x $CRAY_PY ]] && echo "$CRAY_PY" || echo python3.11)}
+"$PYTHON" -c "import sqlite3, ssl, bz2, lzma, ctypes" || { echo "$PYTHON is missing stdlib modules vLLM needs; set PYTHON" >&2; exit 1; }
 VLLM_VERSION=${VLLM_VERSION:-0.26.0}   # last version verified on Isambard-AI GH200; TRL 1.18.2 allows >=0.23,<0.34
 TRL_VERSION=${TRL_VERSION:-1.18.2}
 
@@ -24,7 +27,7 @@ fi
 [[ -n "${CUDA_COMPAT_DIR:-}" ]] && export LD_LIBRARY_PATH=$CUDA_COMPAT_DIR:${LD_LIBRARY_PATH:-}
 
 # 2. venv + packages. vLLM first (it pins torch), then TRL, then project deps.
-"$PYTHON" -m venv "$VENV"
+"$PYTHON" -m venv --clear "$VENV"
 "$VENV/bin/pip" install -q -U pip
 "$VENV/bin/pip" install -q "vllm==$VLLM_VERSION"
 "$VENV/bin/pip" install -q "trl==$TRL_VERSION"

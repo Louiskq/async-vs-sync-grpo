@@ -5,6 +5,7 @@
 #SBATCH --output=logs/%x-%j.out
 # M0: Qwen3-0.6B, 20 steps async then 20 steps sync, no checkpoints, no eval.
 #   sbatch slurm/smoke.sh
+set -e  # stop at the first failed run
 export SKIP_EVAL=1
 bash slurm/_run.sh configs/smoke-async.yaml 0
 bash slurm/_run.sh configs/smoke-sync.yaml 0
