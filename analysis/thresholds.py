@@ -5,7 +5,10 @@
 For each candidate signal it prints, per pilot run, the distribution of its EMA (as the controller sees it) and
 its step-to-step noise (std of first differences of the raw signal, relative to its median). It then suggests:
 
-* signal = the candidate with the lowest relative noise on the async pilot,
+* signal = the candidate that best separates async from sync relative to its own noise:
+           SNR = (async median - sync median) / (std of step-to-step differences on the async pilot).
+           Relative noise alone is not enough: a smooth signal that barely differs between async and sync
+           would put both thresholds inside its noise and the controller would react to noise,
 * high   = p75 of that signal's EMA on the async (max_staleness=4) pilot: tighten when drift is in the top
            quarter of what s=4 produces,
 * low    = midpoint of the sync median (staleness 0: pure trainer/vLLM mismatch) and the async median: loosen
@@ -43,6 +46,7 @@ def describe(run, key: str, alpha: float, skip: int = 3) -> dict | None:
         "ema_p50": float(np.quantile(e, 0.50)),
         "ema_p75": float(np.quantile(e, 0.75)),
         "rel_noise": float(np.std(np.diff(y)) / med) if med > 0 else float("inf"),
+        "abs_noise": float(np.std(np.diff(y))),
     }
 
 
@@ -71,16 +75,24 @@ def main() -> None:
     asy = next((r for r in runs if r.config.removeprefix("pilot-").startswith("async")), None)
     suggestion = None
     if sync and asy:
-        noise = {k: s["rel_noise"] for k, s in report[asy.path.name].items() if s}
-        signal = min(noise, key=noise.get)
-        s_async, s_sync = report[asy.path.name][signal], report[sync.path.name].get(signal)
+        snr = {}
+        for k, s in report[asy.path.name].items():
+            s_sync_k = report[sync.path.name].get(k)
+            if s and s_sync_k and s["abs_noise"] > 0:
+                snr[k] = (s["median"] - s_sync_k["median"]) / s["abs_noise"]
+        print("\nseparation / noise (async vs sync):", {k: round(v, 2) for k, v in snr.items()})
+        signal = max(snr, key=snr.get) if snr else None
+        s_async = report[asy.path.name][signal] if signal else None
+        s_sync = report[sync.path.name].get(signal) if signal else None
         if s_sync:
             suggestion = {
                 "signal": signal,
                 "high": s_async["ema_p75"],
                 "low": (s_sync["median"] + s_async["median"]) / 2,
                 "ema_alpha": a.alpha,
-                "rule": "high = async pilot EMA p75; low = midpoint of sync and async medians; signal = least noisy",
+                "snr": snr[signal],
+                "rule": "high = async pilot EMA p75; low = midpoint of sync and async medians; "
+                "signal = max (async - sync median) / async step-to-step noise",
             }
             print("\nsuggested (review before use):", json.dumps(suggestion, indent=2))
     Path(a.out).parent.mkdir(parents=True, exist_ok=True)

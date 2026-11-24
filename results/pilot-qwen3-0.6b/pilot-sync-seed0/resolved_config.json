@@ -1,0 +1,62 @@
+{
+  "model": "Qwen/Qwen3-0.6B",
+  "max_model_len": 1024,
+  "seed": 0,
+  "attention_kernel": "fa2",
+  "data": {
+    "train_limit": null,
+    "eval_size": 500,
+    "eval_seed": 1234
+  },
+  "common": {
+    "max_steps": 25,
+    "learning_rate": 1e-06,
+    "lr_scheduler_type": "constant",
+    "warmup_steps": 0,
+    "num_generations": 8,
+    "max_completion_length": 512,
+    "temperature": 1.0,
+    "top_p": 1.0,
+    "epsilon": 0.2,
+    "vllm_importance_sampling_clip_min": 0.5,
+    "vllm_importance_sampling_clip_max": 5.0,
+    "chat_template_kwargs": {
+      "enable_thinking": false
+    },
+    "bf16": true,
+    "gradient_checkpointing": true,
+    "logging_steps": 1,
+    "save_strategy": "no",
+    "save_steps": 50,
+    "save_only_model": true,
+    "report_to": "none",
+    "vllm_server_base_url": "http://localhost:8233"
+  },
+  "sync": {
+    "use_vllm": true,
+    "vllm_mode": "server",
+    "per_device_train_batch_size": 32,
+    "gradient_accumulation_steps": 8,
+    "num_iterations": 1,
+    "beta": 0.0,
+    "loss_type": "dapo",
+    "scale_rewards": "group",
+    "vllm_importance_sampling_mode": "token_mask",
+    "shuffle_dataset": false,
+    "model_init_kwargs": {
+      "dtype": "float32"
+    },
+    "vllm_group_port": 51233
+  },
+  "async": {
+    "dtype": "float32",
+    "score_centering": false,
+    "weight_sync_steps": 1,
+    "max_staleness": 4,
+    "token_budget": 18432,
+    "gradient_accumulation_steps": 4
+  },
+  "controller": null,
+  "trainer": "sync",
+  "name": "pilot-sync"
+}
