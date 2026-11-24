@@ -12,7 +12,7 @@ data:
 # Held identical across sync and async (each key must exist in both GRPOConfig and AsyncGRPOConfig).
 common:
   max_steps: 300
-  learning_rate: 1.0e-6
+  learning_rate: 3.0e-6     # not 1e-6: staleness barely moved the policy at 1e-6 (docs/decisions.md)
   lr_scheduler_type: constant
   warmup_steps: 0
   num_generations: 8
@@ -51,9 +51,9 @@ async:
   weight_sync_steps: 1
   max_staleness: 4
   # The async step is token-budgeted, not sample-counted: each optimizer step is gradient_accumulation_steps
-  # rows of <= token_budget unique tokens. The 1.7B pilot trained 220 rollouts/step at 4 x 16384 (~235-token
-  # completions); 4 x 18432 targets ~250, close to sync's 256. The 0.6B re-pilot checks batch/samples_per_step.
-  token_budget: 18432
+  # rows of <= token_budget unique tokens. The 0.6B pilot trained 315 rollouts/step at 4 x 18432; 4 x 15000
+  # targets sync's 256 (batch/samples_per_step is logged every step).
+  token_budget: 15000
   gradient_accumulation_steps: 4
 
 controller: null

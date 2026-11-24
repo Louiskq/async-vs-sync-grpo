@@ -24,3 +24,19 @@ about half the cost per run.
 
 **Consequence:** a 0.6B re-pilot is needed. The controller thresholds must come from pilot data on the setup that is
 actually swept, so the 1.7B pilot is kept as evidence but not used for thresholds.
+
+## 2026-11-24 — Learning rate 3e-6 instead of 1e-6; async token_budget 15000 (after the 0.6B pilot)
+
+**Evidence** (`results/pilot-qwen3-0.6b-lr1e-6/report.md`): at LR 1e-6 async was ~34% faster per step (5.6 vs 8.5 s)
+and reward rose in both runs. But staleness of 1–2 barely changed the policy: clip fraction was 0.17% (sync 0), and
+p95 |log-ratio| was 0.076 vs 0.073, within its own step-to-step noise. The variable under study, and the controller's
+input, would hardly move, so "the controller matches the best fixed setting" would hold almost by construction.
+
+**Choice:** re-pilot at LR 3e-6, a common setting for sub-1B GRPO, so that staleness has a measurable effect. This
+risks instability, which the pilot will show. All runs use the same LR.
+
+**Batch:** at 4 × 18432 tokens async trained 315 rollouts/step, against sync's 256; 4 × 15000 targets 256. The new
+pilot uses the final sweep config, so its thresholds apply directly.
+
+**Also:** the controller signal is now chosen by async-vs-sync separation over noise, not by relative noise alone
+(clip fraction 4.2× vs p95 |log-ratio| 0.6× at 1e-6). See `analysis/thresholds.py`.
