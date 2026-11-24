@@ -21,7 +21,7 @@ no original experiments. This repo adds small-scale measurements.
 | M0 environment smoke test | passed on Isambard-AI GH200 (docs/setup.md) |
 | M1 reward, data, logging | done: unit-tested (`pytest`) |
 | M2 pilot | 1.7B pilot run → switched to 0.6B (docs/decisions.md); 0.6B re-pilot pending |
-| M3 core sweep | scripts ready (`slurm/sweep.sh`) |
+| M3 core sweep | done: results/m3/ (figures + summary.md), logs in results/logs/ — awaiting review |
 | M4 controller | implemented and unit-tested; thresholds come from the pilot |
 | M5 write-up | — |
 
@@ -37,7 +37,7 @@ python analysis/thresholds.py --include '^pilot-'  # controller thresholds from 
 bash slurm/sweep.sh "0 1"                          # M3: sync, async-s1, async-s4 x 2 seeds
 sbatch slurm/async-ctrl.sh 0; sbatch slurm/async-ctrl.sh 1   # M4
 
-python analysis/plots.py --runs $RUNS_DIR          # every figure + results/summary.md, from the logs
+python analysis/plots.py --runs results/logs --out results/m3   # every M3 figure + summary.md, from committed logs
 ```
 
 One run is `sbatch slurm/<config>.sh <seed>`, which wraps `python -m src.train_{sync,async} --config configs/<config>.yaml`.

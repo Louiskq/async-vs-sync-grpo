@@ -1,0 +1,3 @@
+index, name, pci.bus_id, driver_version
+0, NVIDIA GH200 120GB, 00000009:01:00.0, 580.196.07
+1, NVIDIA GH200 120GB, 00000019:01:00.0, 580.196.07

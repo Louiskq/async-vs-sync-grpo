@@ -176,7 +176,13 @@ def fig_eval(groups, out, target: float | None):
         return
     if target is not None:
         ax.axhline(target, color=INK_2, linewidth=1, linestyle="--")
-        ax.annotate("target", (ax.get_xlim()[0], target), xytext=(2, 3), textcoords="offset points", color=INK_2)
+        ax.annotate(
+            "target: 90% of sync's gain",
+            (ax.get_xlim()[0], target),
+            xytext=(2, 3),
+            textcoords="offset points",
+            color=INK_2,
+        )
     ax.set_xlabel("wall-clock since first training step (min)")
     ax.set_ylabel("held-out GSM8K accuracy (greedy, n=500)")
     ax.set_title("Eval accuracy vs wall-clock (bars = min–max over seeds)")
@@ -323,11 +329,30 @@ def fig_controller(groups, out):
 
 
 def summary(groups, out, target_frac: float):
-    def final_acc(r: Run):
-        return r.evals[-1]["accuracy"] if r.evals else None
+    """Results table. Two accuracy targets, because the SPEC's can be met by the base model's neighbourhood:
 
-    sync = [final_acc(r) for r in groups.get("sync", []) if final_acc(r) is not None]
-    target = target_frac * float(np.mean(sync)) if sync else None
+    * spec: ``target_frac`` x sync mean final accuracy (as written in the SPEC);
+    * gain: base + ``target_frac`` x (sync mean final - base), i.e. 90% of sync's *improvement*. With a base model
+      already at ~0.6 and sync ending near ~0.72, the spec target (~0.65) is crossed by every run at its first
+      checkpoint, so it only measures time to step 50.
+    """
+
+    def final_acc(r: Run):
+        # Only a complete eval counts: the last evaluated checkpoint must be the last training step.
+        if not r.evals or not r.rows or r.evals[-1]["step"] < r.rows[-1]["step"]:
+            return None
+        return r.evals[-1]["accuracy"]
+
+    def best_acc(r: Run):
+        return max((e["accuracy"] for e in r.evals if e["step"] > 0), default=None)
+
+    base_vals = [e["accuracy"] for runs in groups.values() for r in runs for e in r.evals if e["step"] == 0]
+    base = float(np.mean(base_vals)) if base_vals else None
+    n_eval = next((e["n"] for runs in groups.values() for r in runs for e in r.evals if e.get("n")), None)
+    sync = [a for r in groups.get("sync", []) if (a := final_acc(r)) is not None]
+    sync_final = float(np.mean(sync)) if sync else None
+    target = target_frac * sync_final if sync_final is not None else None
+    gain_target = base + target_frac * (sync_final - base) if sync_final is not None and base is not None else None
     sync_reward = [r.mean("reward", skip_first=len(r.rows) - 20) for r in groups.get("sync", []) if r.rows]
     reward_target = target_frac * float(np.mean(sync_reward)) if sync_reward else None
 
@@ -340,39 +365,61 @@ def summary(groups, out, target_frac: float):
             s += f" [{fmt.format(min(vals))}, {fmt.format(max(vals))}]"
         return s, float(np.mean(vals))
 
+    def crossing(r: Run, tgt):
+        ev = [(e["wall_s"], e["accuracy"]) for e in r.evals if e.get("wall_s") is not None]
+        return first_crossing(*map(np.asarray, zip(*ev)), tgt) if ev and tgt is not None else None
+
     table = []
+    sync_gain_time = None
     for cfg in order(groups):
         runs = groups[cfg]
-        tte = []
+        tt_gain = [crossing(r, gain_target) for r in runs]
         ttr = []
         for r in runs:
-            ev = [(e["wall_s"], e["accuracy"]) for e in r.evals if e.get("wall_s") is not None]
-            tte.append(first_crossing(*map(np.asarray, zip(*ev)), target) if ev and target is not None else None)
             xs, ys = r.series("reward", "wall_s")
             ttr.append(first_crossing(xs, ema(ys, SMOOTH), reward_target) if xs.size and reward_target else None)
-        row = {
-            "config": cfg,
-            "seeds": len(runs),
-            "final_eval_acc": agg([final_acc(r) for r in runs])[0],
-            "time_to_target_eval_min": agg(tte, 1 / 60, "{:.1f}")[0],
-            "time_to_target_reward_min": agg(ttr, 1 / 60, "{:.1f}")[0],
-            "s_per_step": agg([r.mean("step_s") for r in runs], 1, "{:.1f}")[0],
-            "train_wall_min": agg([r.final_wall_s for r in runs], 1 / 60, "{:.1f}")[0],
-            "gpu_hours": agg([gpu_hours(r) for r in runs], 1, "{:.2f}")[0],
-        }
-        table.append(row)
+        gain_mean = agg(tt_gain, 1 / 60, "{:.1f}")[1]
+        if cfg == "sync":
+            sync_gain_time = gain_mean
+        table.append(
+            {
+                "config": cfg,
+                "seeds": len(runs),
+                "final_eval_acc": agg([final_acc(r) for r in runs])[0],
+                "best_eval_acc": agg([best_acc(r) for r in runs])[0],
+                "time_to_target_spec_min": agg([crossing(r, target) for r in runs], 1 / 60, "{:.1f}")[0],
+                "time_to_target_gain_min": agg(tt_gain, 1 / 60, "{:.1f}")[0],
+                "time_to_target_reward_min": agg(ttr, 1 / 60, "{:.1f}")[0],
+                "s_per_step": agg([r.mean("step_s") for r in runs], 1, "{:.1f}")[0],
+                "train_wall_min": agg([r.final_wall_s for r in runs], 1 / 60, "{:.1f}")[0],
+                "gpu_hours": agg([gpu_hours(r) for r in runs], 1, "{:.2f}")[0],
+                "_gain_mean": gain_mean,
+            }
+        )
+    for row in table:
+        g = row.pop("_gain_mean")
+        row["wallclock_saving_vs_sync"] = (
+            f"{1 - g / sync_gain_time:.0%}" if g is not None and sync_gain_time and row["config"] != "sync" else "—"
+        )
     total = sum(h for runs in groups.values() for r in runs if (h := gpu_hours(r)) is not None)
     cols = list(table[0]) if table else []
     with open(out / "summary.csv", "w", newline="") as f:
         w = csv.DictWriter(f, cols)
         w.writeheader()
         w.writerows(table)
+    se = f"{np.sqrt(sync_final * (1 - sync_final) / n_eval):.3f}" if sync_final is not None and n_eval else "n/a"
+
+    def show(x):
+        return f"{x:.3f}" if x is not None else "n/a"
+
     lines = [
-        f"Target eval accuracy = {target_frac:.0%} of sync mean final accuracy = "
-        + (f"{target:.3f}" if target is not None else "n/a (no sync eval)"),
-        f"Target train reward = {target_frac:.0%} of sync mean reward over its last 20 steps = "
-        + (f"{reward_target:.3f}" if reward_target is not None else "n/a"),
-        "Time-to-target from eval is at checkpoint resolution (every save_steps); from reward, per step.",
+        f"Base model eval accuracy (step 0) = {show(base)}; sync mean final = {show(sync_final)}; "
+        f"binomial s.e. of one eval (n={n_eval}) ≈ {se}.",
+        f"Target (spec) = {target_frac:.0%} of sync final = {show(target)}.",
+        f"Target (gain) = base + {target_frac:.0%} of sync's improvement = {show(gain_target)}.",
+        f"Target (reward) = {target_frac:.0%} of sync mean train reward, last 20 steps = {show(reward_target)}.",
+        "Eval times are at checkpoint resolution (every save_steps), reward times per step. Wall-clock excludes "
+        "startup and checkpoint writes. wallclock_saving_vs_sync uses the gain target.",
         "",
         "| " + " | ".join(cols) + " |",
         "|" + "---|" * len(cols),
@@ -382,7 +429,7 @@ def summary(groups, out, target_frac: float):
     ]
     (out / "summary.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
-    return target
+    return gain_target
 
 
 def main() -> None:
