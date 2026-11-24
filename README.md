@@ -33,13 +33,6 @@ These match published one-step-lag results: ~40% faster in
 [Asynchronous RLHF](https://arxiv.org/abs/2410.18252) and 23–40% in
 [verl's one-step-off recipe](https://verl.readthedocs.io/en/latest/advance/one_step_off.html).
 
-## What was not done
-
-The SPEC also asked whether a controller that adjusts `max_staleness` during a run could beat the best fixed
-setting. **This was not tested.** Every setting of 1 or more performed the same, so there was nothing for a
-controller to improve on. A controller is implemented and unit-tested (`src/controller.py`), but it was never
-used in a training run. See [`docs/decisions.md`](docs/decisions.md).
-
 ## Limitations
 
 - Small: a 0.6B model, 300 steps, 512-token completions, 2 seeds, eval every 50 steps.
