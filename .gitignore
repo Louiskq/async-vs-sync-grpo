@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.env
+.env.*
+.claude/settings.local.json
+# cluster-specific paths and accounts
+slurm/env.sh
+# run outputs (logs, checkpoints) live on scratch; results/ holds the committed figures/tables
+runs/
+logs/*
+!logs/.gitkeep
+wandb/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
